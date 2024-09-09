@@ -26,39 +26,57 @@ type Cat = {
 const HomeScreen: React.FC<{ navigation: HomeScreenNavigationProp }> = ({ navigation }) => {
   const [cats, setCats] = useState<Cat[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(0); // Add a page state for pagination
+  const [isFetchingMore, setIsFetchingMore] = useState<boolean>(false); // To track if more cats are being fetched
 
   useEffect(() => {
-    const fetchCats = async () => {
-      setLoading(true);
-      try {
-        const response = await axios.get('https://api.thecatapi.com/v1/images/search', {
-          params: {
-            size: 'med',
-            mime_types: 'jpg',
-            format: 'json',
-            has_breeds: 'true',
-            order: 'RANDOM',
-            page: 0,
-            limit: 25,
-          },
-          headers: {
-            'x-api-key': 'YOUR_CAT_API_KEY',
-          },
-        });
-        const updatedCats = response.data.map((cat: Cat) => ({
-          ...cat,
-          isFavt: false,
-        }));
-        setCats(updatedCats);
-      } catch (error) {
-        console.error('Failed to fetch cats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCats();
+    fetchCats(); // Fetch initial cats
   }, []);
+
+  const fetchCats = async (loadMore = false) => {
+    if (loading || isFetchingMore) return; // Prevent multiple calls
+
+    if (loadMore) {
+      setIsFetchingMore(true); // Set fetching more flag
+    } else {
+      setLoading(true); // Show loading indicator for the first page
+    }
+
+    try {
+      const response = await axios.get('https://api.thecatapi.com/v1/images/search', {
+        params: {
+          size: 'med',
+          mime_types: 'jpg',
+          format: 'json',
+          has_breeds: 'true',
+          order: 'RANDOM',
+          page,
+          limit: 25,
+        },
+        headers: {
+          'x-api-key': 'YOUR_CAT_API_KEY',
+        },
+      });
+
+      const updatedCats = response.data.map((cat: Cat) => ({
+        ...cat,
+        isFavt: false,
+      }));
+
+      if (loadMore) {
+        setCats(prevCats => [...prevCats, ...updatedCats]); // Append new cats
+      } else {
+        setCats(updatedCats); // Set initial cats
+      }
+
+      setPage(prevPage => prevPage + 1); // Increment page
+    } catch (error) {
+      console.error('Failed to fetch cats:', error);
+    } finally {
+      setLoading(false);
+      setIsFetchingMore(false);
+    }
+  };
 
   const handleFavoriteToggle = async (cat: Cat) => {
     const { id, isFavt, favtId } = cat;
@@ -95,6 +113,17 @@ const HomeScreen: React.FC<{ navigation: HomeScreenNavigationProp }> = ({ naviga
   };
 
   const handleVote = async (imageId: string, voteType: 'up' | 'down') => {
+    const cat = cats.find(c => c.id === imageId);
+    if (!cat) return;
+  
+    const currentScore = getScore(cat.score);
+  
+    // Prevent downvoting if the score is 0 or less
+    if (voteType === 'down' && currentScore <= 0) {
+      console.log('Score is already zero, cannot downvote further.');
+      return;
+    }
+  
     try {
       const response = await axios.post(
         'https://api.thecatapi.com/v1/votes',
@@ -119,6 +148,7 @@ const HomeScreen: React.FC<{ navigation: HomeScreenNavigationProp }> = ({ naviga
       console.error('Failed to handle vote:', error);
     }
   };
+  
 
   const getScore = (scores: number[] = []): number => {
     return scores.reduce((total, score) => total + score, 0);
@@ -149,10 +179,10 @@ const HomeScreen: React.FC<{ navigation: HomeScreenNavigationProp }> = ({ naviga
       <TouchableOpacity
         style={styles.uploadButton}
         onPress={() => navigation.navigate('Upload')}>
-        <Text style={styles.uploadButtonText}>Upload a new cat</Text>
+        <Text style={styles.uploadButtonText}>Upload a New Cat</Text>
       </TouchableOpacity>
 
-      {loading ? (
+      {loading && page === 0 ? (
         <View style={styles.container}>
           <ActivityIndicator size="large" color="#FF6F61" />
         </View>
@@ -162,6 +192,9 @@ const HomeScreen: React.FC<{ navigation: HomeScreenNavigationProp }> = ({ naviga
           renderItem={renderItem}
           keyExtractor={item => item.id}
           numColumns={2}
+          onEndReached={() => fetchCats(true)} // Fetch more cats when the user reaches the end
+          onEndReachedThreshold={0.5} // Trigger the fetch when 50% from the bottom
+          ListFooterComponent={isFetchingMore ? <ActivityIndicator size="large" color="#FF6F61" /> : null}
           ListEmptyComponent={<View><Text>No cats found</Text></View>}
         />
       )}
@@ -215,6 +248,7 @@ const styles = StyleSheet.create({
   uploadButtonText: {
     color: '#fff',
     fontSize: 18,
+    textAlign: 'center'
   },
 });
 
