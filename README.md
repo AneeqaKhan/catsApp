@@ -9,6 +9,10 @@ CatsApp is a React Native application that allows users to browse, favorite, and
 - Vote on Cats: Upvote or downvote cat images.
 - Upload Cat Images: Upload new cat images to the API.
 
+## Screenshots
+<img src="https://github.com/user-attachments/assets/cd8533d8-16e5-464a-889d-9e74a959dd9b" width="250">
+<img src="https://github.com/user-attachments/assets/e11d5563-bbc0-47d1-a563-249c0ba63f3b" width="250">
+
 ## Getting Started
 
 1. Clone the Repository
